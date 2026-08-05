@@ -188,6 +188,245 @@ app.patch('/api/todos/:id/toggle', (req, res) => {
 
 ---
 
+### Pattern: React Query Delete Mutation with Error Handling
+
+**Context**: Implementing delete functionality in React Query for API mutations
+
+**Problem**: Need to call DELETE API endpoint and handle errors gracefully while invalidating cache on success
+
+**Solution**: Use `useMutation` with async `mutationFn`, check `response.ok`, throw errors, and invalidate queries in `onSuccess`
+
+**Example**:
+```javascript
+// ✅ Good: Complete delete mutation with error handling
+const deleteTodoMutation = useMutation({
+  mutationFn: async (id) => {
+    const response = await fetch(`${API_URL}/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      throw new Error('Failed to delete todo');
+    }
+    return response.json();
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['todos'] });
+  },
+});
+
+// ❌ Avoid: Missing error handling
+const deleteTodoMutation = useMutation({
+  mutationFn: async (id) => {
+    console.log('Delete todo:', id);
+    // No actual API call!
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['todos'] });
+  },
+});
+```
+
+**Related Files**:
+- `packages/frontend/src/App.js` - Delete mutation implementation
+- `packages/frontend/src/__tests__/App.test.js` - Delete mutation tests
+
+**Notes**:
+- Always check `response.ok` before processing response
+- Throw errors to trigger React Query's error handling
+- Use `invalidateQueries` to refetch data after mutation
+- Pattern applies to all destructive mutations (DELETE, but also PUT/PATCH that remove data)
+
+---
+
+### Pattern: Array Filter for Calculated Stats
+
+**Context**: Displaying statistics derived from an array of items (e.g., todo counts)
+
+**Problem**: Need to calculate and display counts of items matching certain criteria (incomplete vs completed)
+
+**Solution**: Use `Array.filter()` with a predicate to count items, accessing the `.length` property
+
+**Example**:
+```javascript
+// ✅ Good: Calculate stats from array
+const incompleteTodos = todos.filter(todo => !todo.completed).length;
+const completedTodos = todos.filter(todo => todo.completed).length;
+
+<Chip label={`${incompleteTodos} items left`} color="primary" />
+<Chip label={`${completedTodos} completed`} color="success" />
+
+// ❌ Avoid: Hardcoded values
+<Chip label={`${0} items left`} color="primary" />
+<Chip label={`${0} completed`} color="success" />
+
+// ❌ Avoid: Manual counting with loops
+let incompleteTodos = 0;
+for (let i = 0; i < todos.length; i++) {
+  if (!todos[i].completed) {
+    incompleteTodos++;
+  }
+}
+```
+
+**Related Files**:
+- `packages/frontend/src/App.js` - Stats calculation implementation
+- `packages/frontend/src/__tests__/App.test.js` - Stats display tests
+
+**Notes**:
+- `filter()` + `.length` is idiomatic JavaScript for counting
+- More declarative than imperative loops
+- Easy to test and verify
+- Can be memoized with `useMemo()` if performance is a concern
+- Pattern applies to any derived statistics from array data
+
+---
+
+### Pattern: Conditional Empty State Rendering in React
+
+**Context**: Displaying helpful messages when data arrays are empty in UI components
+
+**Problem**: Empty state (no data) can confuse users - need to show guidance instead of blank screen
+
+**Solution**: Use conditional rendering with logical AND (`&&`) to show empty state message when array is empty
+
+**Example**:
+```javascript
+// ✅ Good: Conditional empty state
+{!isLoading && !isError && todos.length === 0 && (
+  <Card sx={{ mb: 3 }}>
+    <CardContent>
+      <Typography align="center" color="text.secondary">
+        No todos yet. Add one to get started!
+      </Typography>
+    </CardContent>
+  </Card>
+)}
+
+{!isLoading && !isError && todos.length > 0 && (
+  <Card>
+    <List>
+      {todos.map(todo => <TodoItem key={todo.id} todo={todo} />)}
+    </List>
+  </Card>
+)}
+
+// ❌ Avoid: No empty state handling
+<Card>
+  <List>
+    {todos.map(todo => <TodoItem key={todo.id} todo={todo} />)}
+  </List>
+</Card>
+```
+
+**Related Files**:
+- `packages/frontend/src/App.js` - Empty state implementation
+- `packages/frontend/src/__tests__/App.test.js` - Empty state test
+
+**Notes**:
+- Check loading and error states before showing empty state
+- Provide actionable guidance (e.g., "Add one to get started!")
+- Use semantic HTML and accessible typography
+- Pattern applies to any list/collection display in React
+- Consider adding illustrations or call-to-action buttons for better UX
+
+---
+
+### Pattern: Error Handling in React Query useQuery
+
+**Context**: Fetching data from API using React Query with proper error handling
+
+**Problem**: Network failures or API errors should be caught and displayed to users gracefully
+
+**Solution**: Check `response.ok`, throw errors in `queryFn`, and use `isError`/`error` from `useQuery` result
+
+**Example**:
+```javascript
+// ✅ Good: Complete error handling
+const useTodos = () => {
+  return useQuery({
+    queryKey: ['todos'],
+    queryFn: async () => {
+      const response = await fetch(API_URL);
+      if (!response.ok) {
+        throw new Error('Failed to fetch todos');
+      }
+      return response.json();
+    },
+  });
+};
+
+// In component:
+const { data: todos = [], isLoading, isError, error } = useTodos();
+
+{isError && (
+  <Card>
+    <CardContent>
+      <Typography color="error" align="center">
+        Error loading todos: {error.message}
+      </Typography>
+    </CardContent>
+  </Card>
+)}
+
+// ❌ Avoid: Missing error checks
+const useTodos = () => {
+  return useQuery({
+    queryKey: ['todos'],
+    queryFn: async () => {
+      const response = await fetch(API_URL);
+      const data = await response.json(); // Might fail!
+      return data;
+    },
+  });
+};
+```
+
+**Related Files**:
+- `packages/frontend/src/App.js` - useQuery with error handling
+- `packages/frontend/src/__tests__/App.test.js` - Query tests
+
+**Notes**:
+- Always check `response.ok` before calling `.json()`
+- Throw errors to trigger React Query's error state
+- Display error messages to users in accessible way
+- React Query provides retry logic by default
+- Pattern applies to all data fetching with React Query
+
+---
+
+### Pattern: Relative API URLs for Environment Portability
+
+**Context**: Configuring API URLs in frontend applications that may run in different environments
+
+**Problem**: Hardcoded absolute URLs (e.g., `http://localhost:3001`) break when deployed or in different environments
+
+**Solution**: Use relative URLs (e.g., `/api/todos`) and rely on proxy configuration in development
+
+**Example**:
+```javascript
+// ✅ Good: Relative URL
+const API_URL = '/api/todos';
+
+// Works with proxy in package.json:
+// "proxy": "http://localhost:3001"
+
+// ❌ Avoid: Hardcoded absolute URL
+const API_URL = 'http://localhost:3001/api/todos';
+```
+
+**Related Files**:
+- `packages/frontend/src/App.js` - API URL configuration
+- `packages/frontend/package.json` - Proxy configuration
+
+**Notes**:
+- Relative URLs work with development proxy and production same-origin deployment
+- For different origins in production, use environment variables: `process.env.REACT_APP_API_URL`
+- Development proxy configured in frontend package.json
+- Pattern applies to all frontend API configurations
+- Makes app portable across environments without code changes
+
+---
+
 ### Pattern: [Your Next Pattern]
 
 **Context**: 
