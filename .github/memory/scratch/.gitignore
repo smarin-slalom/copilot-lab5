@@ -1,0 +1,6 @@
+# Ignore all files in scratch/ directory
+# This is working memory only - not committed to git
+*
+
+# Allow .gitignore itself
+!.gitignore
